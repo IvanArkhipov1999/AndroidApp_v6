@@ -28,6 +28,8 @@ public class FinalActivity extends Activity {
         if (readFile() < SpaceShooterView.score)
             writeFile();
         tw1.setText(""+readFile());
+        SpaceShooterView.score = 0;
+        SpaceShooterView.lives = 3;
     }
     int readFile() {
         try {

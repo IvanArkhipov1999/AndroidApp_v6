@@ -25,6 +25,7 @@ import java.util.Random;
 public class SpaceShooterView extends SurfaceView implements Runnable{
 
     Context context;
+
     final Random random = new Random();
     // This is our thread
     private Thread gameThread = null;
@@ -37,7 +38,7 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
     private volatile boolean playing;
 
     // Game is paused at the start
-    private boolean paused = true;
+    private volatile boolean paused = false;
 
     // A Canvas and a Paint object
     private Canvas canvas;
@@ -57,15 +58,12 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
     //private EnemyShip enemyShip;
     private ArrayList<EnemyShip> enemyShip;
     private PlayerShip playerShip;
+    private PauseButton pauseButton;
+    private ResumeButton resumeButton;
 
     // The player's bullets
     private ArrayList<Bullet> bullets;
 
-
-    // The invaders bullets
-    private Bullet[] invadersBullets = new Bullet[200];
-    private int nextBullet;
-    private int maxInvaderBullets = 10;
 
     // Up to 60 invaders
 //    Invader[] invaders = new Invader[60];
@@ -98,7 +96,6 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
     private long lastMenaceTime = System.currentTimeMillis();
 
     private boolean wasTouched;
-
 
     int bTime = 0;
     int eTime = 0;
@@ -180,6 +177,8 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
         //enemyShip = new EnemyShip(context, screenX-150, screenY-1000);
         enemyShip = new ArrayList<EnemyShip>();
         // Build the shelters
+        pauseButton = new PauseButton(context, screenX-100, screenY-200);
+        resumeButton = new ResumeButton(context, screenX-100, screenY-200);
 
     }
 
@@ -187,8 +186,7 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
     private int s = 1;
     @Override
     public void run() {
-        score = 0;
-        while (playing) {
+        while (playing || paused) {
 
             // Capture the current time in milliseconds in startFrameTime
             long startFrameTime = System.currentTimeMillis();
@@ -207,31 +205,29 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
     }
 
     private void update(){
+        if (playing) {
+            // Did an invader bump into the side of the screen
+            boolean bumped = false;
 
-        // Did an invader bump into the side of the screen
-        boolean bumped = false;
+            // Has the player lost
+            boolean lost = false;
 
-        // Has the player lost
-        boolean lost = false;
-
-        long nextTime = System.currentTimeMillis();
-        if(bTime == bSpeed){
-            playerShip.shoot(bullets);
-            bTime-=bSpeed;
-        }
-        else bTime++;
-        if(eTime == eSpeed){
-            EnemyShip enemy = new EnemyShip(context, screenX, screenY);
-            enemy.startShip((random.nextInt((screenX-(int)enemy.getWidth()*2))+(int)enemy.getWidth())+random.nextFloat());
-            enemyShip.add(enemy);
-            eTime-=eSpeed;
-        }
-        else eTime++;
-        // Move the player's ship
-        playerShip.update(fps);
-        // Update the invaders if visible
-        for(int i = 0; i < enemyShip.size(); i++){
-            EnemyShip e = enemyShip.get(i);
+            long nextTime = System.currentTimeMillis();
+            if (bTime == bSpeed) {
+                playerShip.shoot(bullets);
+                bTime -= bSpeed;
+            } else bTime++;
+            if (eTime == eSpeed) {
+                EnemyShip enemy = new EnemyShip(context, screenX, screenY);
+                enemy.startShip((random.nextInt((screenX - (int) enemy.getWidth() * 2)) + (int) enemy.getWidth()) + random.nextFloat());
+                enemyShip.add(enemy);
+                eTime -= eSpeed;
+            } else eTime++;
+            // Move the player's ship
+            playerShip.update(fps);
+            // Update the invaders if visible
+            for (int i = 0; i < enemyShip.size(); i++) {
+                EnemyShip e = enemyShip.get(i);
             /*if (accTime == accSpeed && e.getShipSpeed() < 500 && eSpeed > 45){
                 eSpeed--;
                 e.setShipSpeed(e.getShipSpeed() + acc);
@@ -239,56 +235,57 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
                 Log.d("Okey", "Okey");
             }
             accTime++;*/
-            if(e.getStatus()) {
-                e.update(fps);
-            }
-            if(e.getY() > screenY && e.isVisible() == true) {
-                enemyShip.remove(e);
-                lives--;
-                if (lives == 0){
-                    playing = false;
-                    Intent intent = new Intent(getContext(), FinalActivity.class);
-                    getContext().startActivity(intent);
+                if (e.getStatus()) {
+                    e.update(fps);
+                }
+                if ((e.getY() > screenY && e.isVisible() == true) || (RectF.intersects(playerShip.getRect(), e.getRect()) && e.isVisible() == true)) {
+                    enemyShip.remove(e);
+                    lives--;
+                    if (lives == 0) {
+                        playing = false;
+                        Intent intent = new Intent(getContext(), FinalActivity.class);
+                        getContext().startActivity(intent);
+                    }
                 }
             }
-        }
-        //accTime++;
-        // Update all the invaders bullets if active
+            //accTime++;
+            // Update all the invaders bullets if active
 //
-        // Did an invader bump into the edge of the screen
+            // Did an invader bump into the edge of the screen
 
-        if(lost){
-            prepareLevel();
-        }
-
-        // Update the players bullet
-
-        for(int i = 0; i < bullets.size(); i++){
-            Bullet b = bullets.get(i);
-            if(b.getStatus()) {
-                b.update(fps);
+            if (lost) {
+                prepareLevel();
             }
-            if(b.getY() < 0)
-                bullets.remove(b);
-        }
-        //Log.d("bulletsCount",String.valueOf(bullets.size()));
 
-        // Has the player's bullet hit the top of the screen
+            // Update the players bullet
 
-        // Has an invaders bullet hit the bottom of the screen
+            for (int i = 0; i < bullets.size(); i++) {
+                Bullet b = bullets.get(i);
+                if (b.getStatus()) {
+                    b.update(fps);
+                }
+                if (b.getY() < 0)
+                    bullets.remove(b);
+            }
+            //Log.d("bulletsCount",String.valueOf(bullets.size()));
 
-        // Has the player's bullet hit an invader
-        for(Bullet b : bullets) {
-            if (b.getStatus()) {
-                if (b.isVisible()) {
-                    for (EnemyShip e : enemyShip) {
-                        if (e.getStatus()) {
-                            if (e.isVisible()) {
-                                if (RectF.intersects(b.getRect(), e.getRect())) {
-                                    e.setVisible(false);
-                                    b.setVisible(false);
-                                    score = score + 1;
-                                    Log.d("bulletsCount", "true");
+            // Has the player's bullet hit the top of the screen
+
+            // Has an invaders bullet hit the bottom of the screen
+
+            // Has the player's bullet hit an invader
+            for (Bullet b : bullets) {
+                if (b.getStatus()) {
+                    if (b.isVisible()) {
+                        for (EnemyShip e : enemyShip) {
+                            if (e.getStatus()) {
+                                if (e.isVisible()) {
+                                    if (RectF.intersects(b.getRect(), e.getRect())) {
+                                        e.setVisible(false);
+                                        b.setVisible(false);
+                                        score = score + 1;
+                                        Log.d("bulletsCount", "true");
+                                    }
                                 }
                             }
                         }
@@ -304,54 +301,58 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
         if (ourHolder.getSurface().isValid()) {
             // Lock the canvas ready to draw
             canvas = ourHolder.lockCanvas();
+            if (playing) {
+                // Draw the background color
+                canvas.drawColor(Color.BLACK);
+                // Choose the brush color for drawing
+                paint.setColor(Color.WHITE);
+                for (int i = 0; i < 100; i++)
+                    canvas.drawCircle(random.nextInt(screenX), random.nextInt(screenY), 2, paint);
 
-            // Draw the background color
-            //canvas.drawColor(Color.argb(255, 26, 128, 182));
-            canvas.drawColor(Color.BLACK);
-            // Choose the brush color for drawing
-            paint.setColor(Color.argb(255, 255, 255, 255));
+                // Draw the player spaceship
+                canvas.drawBitmap(playerShip.getBitmap(), playerShip.getX(), playerShip.getY(), paint);
+                canvas.drawBitmap(pauseButton.getBitmap(), pauseButton.getX(), pauseButton.getY(), paint);
+                // Draw the invaders
+                for (EnemyShip e : enemyShip) {
+                    if (e.getStatus() && e.isVisible()) {
+                        canvas.save();
+                        canvas.rotate(180);
+                        canvas.drawBitmap(e.getBitmap(), -e.getWidth() - e.getX(), -e.getHeight() - e.getY(), paint);
 
-            // Draw the player spaceship
-            canvas.drawBitmap(playerShip.getBitmap(), playerShip.getX(), playerShip.getY(), paint);
-            // Draw the invaders
-            for (EnemyShip e : enemyShip) {
-                if (e.getStatus() && e.isVisible()) {
-                    canvas.save();
-                    canvas.rotate(180);
-                    canvas.drawBitmap(e.getBitmap(), -e.getWidth() - e.getX(), -e.getHeight() - e.getY(), paint);
-
-                    canvas.restore();
+                        canvas.restore();
+                    }
                 }
-            }
-            // Draw the bricks if visible
+                // Draw the bricks if visible
 
-            // Draw the players bullet if active
-            paint.setColor(Color.CYAN);
-            for (int i = 0; i < bullets.size(); i++) {
-                Bullet bull = bullets.get(i);
-                if (bull.getStatus() && bull.isVisible()) {
-                    //canvas.drawRect(bull.getRect(), paint);
-                    canvas.drawBitmap(bull.getBitmap(), null, bull.getRect(), paint);
+                // Draw the players bullet if active
+                paint.setColor(Color.CYAN);
+                for (int i = 0; i < bullets.size(); i++) {
+                    Bullet bull = bullets.get(i);
+                    if (bull.getStatus() && bull.isVisible()) {
+                        //canvas.drawRect(bull.getRect(), paint);
+                        canvas.drawBitmap(bull.getBitmap(), null, bull.getRect(), paint);
+                    }
                 }
+                // Draw the invaders bullets if active
+
+                // Draw the score and remaining lives
+                // Change the brush color
+                paint.setColor(Color.argb(255, 249, 129, 0));
+                paint.setTextSize(40);
+                canvas.drawText("Score: " + score + "   Lives: " + lives, 10, 50, paint);
             }
-            // Draw the invaders bullets if active
-
-            // Draw the score and remaining lives
-            // Change the brush color
-            paint.setColor(Color.argb(255, 249, 129, 0));
-            paint.setTextSize(40);
-            canvas.drawText("Score: " + score + "   Lives: " + lives, 10, 50, paint);
-
+            else
+                canvas.drawBitmap(resumeButton.getBitmap(), resumeButton.getX(), resumeButton.getY(), paint);
             // Draw everything to the screen
             ourHolder.unlockCanvasAndPost(canvas);
         }
     }
 
-
     // If SpaceInvadersActivity is paused/stopped
     // shutdown our thread.
     public void pause() {
         playing = false;
+        paused = true;
         try {
             gameThread.join();
         } catch (InterruptedException e) {
@@ -364,6 +365,7 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
     // start our thread.
     public void resume() {
         playing = true;
+        paused = false;
         gameThread = new Thread(this);
         gameThread.start();
     }
@@ -378,7 +380,13 @@ public class SpaceShooterView extends SurfaceView implements Runnable{
 
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN: // нажатие
-
+                if ((pauseButton.getX() < x && (pauseButton.getX() + pauseButton.getWidth() > x))
+                        && (pauseButton.getY() < y && (pauseButton.getY() + pauseButton.getHeight() > y))) {
+                    if (playing)
+                        pause();
+                    else
+                        resume();
+                }
                 if ((playerShip.getX() < x && (playerShip.getX() + playerShip.getWidth() > x))
                         && (playerShip.getY() < y && (playerShip.getY() + playerShip.getHeight() > y))) {
 

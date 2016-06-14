@@ -4,8 +4,6 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.RectF;
-import java.util.Random;
-import java.util.ArrayList;
 
 /**
  * Created by user on 6/8/2016.
@@ -35,11 +33,6 @@ public class EnemyShip {
 
     private boolean isActive;
 
-    public final int UP = 0;
-
-    int heading = -1;
-
-    final Random random = new Random();
 
     public EnemyShip(Context context, int screenX, int screenY){
         // Initialize a blank RectF
@@ -48,7 +41,7 @@ public class EnemyShip {
         height = screenY/6;
         // Start ship in roughly the screen centre
         x = screenX / 2;
-        y = -200;
+        y = -500;
         // Initialize the bitmap
         bitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.enemy);
         // stretch the bitmap to a size appropriate for the screen resolution
